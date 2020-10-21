@@ -8,7 +8,10 @@ use App\Form\CommentFormType;
 use App\Repository\CommentRepository;
 use App\Repository\ConferenceRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use http\Exception\RuntimeException;
+use Mael\InterventionImageBundle\MaelInterventionImageManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -41,7 +44,8 @@ class ConferenceController extends AbstractController
     public function show(
         Request $request,
         Conference $conference,
-        CommentRepository $commentRepository
+        CommentRepository $commentRepository,
+        string $photoDir
     ) {
         $comment = new Comment();
         $form = $this->createForm(CommentFormType::class, $comment, ['allow_extra_fields' => true]);
@@ -49,6 +53,15 @@ class ConferenceController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $comment->setConference($conference);
+            if ($photo = $form['photo']->getData()){
+                $filename = bin2hex(random_bytes(6)).'.'.$photo->guessExtension();
+                try {
+                    $photo->move($photoDir, $filename);
+                }catch (FileException $e){
+                    throw new \RuntimeException("unable to save file");
+                }
+                $comment->setPhotoFilename($filename);
+            }
 
             $this->entityManager->persist($comment);
             $this->entityManager->flush();
